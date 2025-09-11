@@ -90,20 +90,3 @@ class MenuService {
     }
   }
 }
-
-
-    final response = await http.get(Uri.parse('https://insiit-backend-node.vercel.app/api/mess-menu'));
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      final messMenu = MessMenu.fromJson(responseData);
-      
-      // Cache fetched data
-      await prefs.setString('cachedMenu', response.body);
-      await prefs.setInt('cacheTimestamp', DateTime.now().millisecondsSinceEpoch);
-      
-      return messMenu;
-    } else {
-      throw Exception('Failed to load menu');
-    }
-  }
-}
