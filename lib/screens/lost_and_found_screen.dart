@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import '../models/lostfound.dart';
 import '../services/lost_found_api_service.dart';
-
-
 class LostAndFoundScreen extends StatefulWidget {
   const LostAndFoundScreen({super.key});
 
@@ -13,7 +11,7 @@ class LostAndFoundScreen extends StatefulWidget {
 
 class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
   final LostFoundApiService apiService = LostFoundApiService();
-  
+
   late Future<List<LostFoundItem>> _lostItemsFuture;
 
   @override
@@ -37,6 +35,7 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _refreshData,
+        
         child: FutureBuilder<List<LostFoundItem>>(
           future: _lostItemsFuture,
           builder: (context, snapshot) {
@@ -44,14 +43,13 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
                     'Error: ${snapshot.error}\n\n'
-                    '(Is your backend server running? Is the IP address in api_service.dart correct?)',
+                    '(Is your backend server running? Is the IP address correct?)',
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -61,9 +59,8 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text('No lost items found.'));
             }
-
             final items = snapshot.data!;
-            
+
             return ListView.builder(
               itemCount: items.length,
               itemBuilder: (context, index) {
@@ -76,7 +73,7 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
                     subtitle: Text('Lost at: ${item.lostLocation}'),
                     trailing: const Text('View Details'),
                     onTap: () {
-                      // Todo : Navigate to a detail screen for this item
+                      // TODO: Navigate to a detail screen
                     },
                   ),
                 );
@@ -84,7 +81,21 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
             );
           },
         ),
+      ), 
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const NewLostItemForm(),
+            ),
+          ).then((_) {
+            _refreshData();
+          });
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add),
       ),
     );
   }
-}
+},
