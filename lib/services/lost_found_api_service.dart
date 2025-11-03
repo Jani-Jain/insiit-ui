@@ -8,7 +8,6 @@ class LostFoundApiService {
   static const String BASE_URL = 'http://192.168.56.1:3000/api';
 
   
-  // --- GET all "lost" (active) items ---
   Future<List<LostFoundItem>> getLostItems() async {
     try {
       final response = await http.get(Uri.parse('$BASE_URL/lostfound'));
@@ -17,7 +16,6 @@ class LostFoundApiService {
         List<dynamic> data = json.decode(response.body);
         return data.map((itemJson) => LostFoundItem.fromJson(itemJson)).toList();
       } else {
-        // If the server returns an error, throw an exception
         throw Exception('Failed to load lost items (Status code: ${response.statusCode})');
       }
     } catch (e) {
@@ -40,7 +38,7 @@ class LostFoundApiService {
     }
   }
 
-  // --- POST a new item ---
+  // POST a new item 
   Future<bool> postNewItem({
     required String title,
     String? description,
@@ -91,7 +89,7 @@ class LostFoundApiService {
     }
   }
 
-  // --- DELETE an item ---
+  // DELETE an item 
   Future<bool> deleteItem(String itemId) async {
     try {
       final response = await http.delete(
