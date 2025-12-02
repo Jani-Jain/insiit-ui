@@ -1,7 +1,9 @@
-
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/lostfound.dart';
 import '../services/lost_found_api_service.dart';
+
 class LostAndFoundScreen extends StatefulWidget {
   const LostAndFoundScreen({super.key});
 
@@ -12,90 +14,157 @@ class LostAndFoundScreen extends StatefulWidget {
 class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
   final LostFoundApiService apiService = LostFoundApiService();
 
+  late String userEmail;
   late Future<List<LostFoundItem>> _lostItemsFuture;
+  late Future<List<LostFoundItem>> _myItemsFuture;
 
   @override
   void initState() {
     super.initState();
+    userEmail = FirebaseAuth.instance.currentUser?.email ?? "";
+    _loadAll();
+  }
+
+  void _loadAll() {
     _lostItemsFuture = apiService.getLostItems();
+    _myItemsFuture = apiService.getUserItems(userEmail);
   }
 
   Future<void> _refreshData() async {
     setState(() {
-      _lostItemsFuture = apiService.getLostItems();
+      _loadAll();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lost & Found'),
-        backgroundColor: Colors.black87,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
-        
-        child: FutureBuilder<List<LostFoundItem>>(
-          future: _lostItemsFuture,
-          builder: (context, snapshot) {
-            
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Error: ${snapshot.error}\n\n'
-                    '(Is your backend server running? Is the IP address correct?)',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              );
-            }
-
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('No lost items found.'));
-            }
-            final items = snapshot.data!;
-
-            return ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Card(
-                  key: ValueKey(item.id),
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    title: Text(item.title),
-                    subtitle: Text('Lost at: ${item.lostLocation}'),
-                    trailing: const Text('View Details'),
-                    onTap: () {
-                      // TODO: Navigate to a detail screen
-                    },
-                  ),
-                );
-              },
-            );
-          },
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Lost & Found"),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: "All Items"),
+              Tab(text: "My Items"),
+            ],
+          ),
         ),
-      ), 
-
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const NewLostItemForm(),
-            ),
-          ).then((_) {
-            _refreshData();
-          });
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add),
+        body: TabBarView(
+          children: [
+            _buildAllItems(),
+            _buildMyItems(),
+          ],
+        ),
       ),
     );
   }
-},
+
+  Widget _buildAllItems() {
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: FutureBuilder<List<LostFoundItem>>(
+        future: _lostItemsFuture,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+          final items = snapshot.data!;
+          if (items.isEmpty) return const Center(child: Text("No lost items"));
+
+          return ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (c, i) => _buildItemCard(items[i], showButtons: false),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMyItems() {
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: FutureBuilder<List<LostFoundItem>>(
+        future: _myItemsFuture,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+          final items = snapshot.data!;
+          if (items.isEmpty) return const Center(child: Text("You haven't posted anything."));
+
+          return ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (c, i) => _buildItemCard(items[i], showButtons: true),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildItemCard(LostFoundItem item, {required bool showButtons}) {
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: ListTile(
+        title: Text(item.title),
+        subtitle: Text("Location: ${item.lostLocation}"),
+        trailing: showButtons
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                      icon: const Icon(Icons.check_circle, color: Colors.green),
+                      onPressed: () => _openMarkFoundDialog(item)),
+                  IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _confirmDelete(item)),
+                ],
+              )
+            : const Icon(Icons.arrow_forward_ios),
+      ),
+    );
+  }
+
+  void _confirmDelete(LostFoundItem item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete this item?"),
+        content: const Text("You cannot undo this."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await apiService.deleteItem(item.id, userEmail);
+      _refreshData();
+    }
+  }
+
+  void _openMarkFoundDialog(LostFoundItem item) {
+    final emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Mark as Found"),
+        content: TextField(
+          controller: emailController,
+          decoration: const InputDecoration(labelText: "Finder's email"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            child: const Text("Submit"),
+            onPressed: () async {
+              await apiService.markItemAsFound(item.id, emailController.text.trim());
+              Navigator.pop(context);
+              _refreshData();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
