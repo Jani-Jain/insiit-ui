@@ -251,7 +251,7 @@ class _ImageCarouselState extends State<ImageCarousel> {
       return Container(
         color: Colors.grey.shade300,
         child: const Center(
-          child: Text("No Image Available", style: TextStyle(color: Colors.black54)),
+          child: Text("Use your image-ination", style: TextStyle(color: Colors.black54)),
         ),
       );
     }
