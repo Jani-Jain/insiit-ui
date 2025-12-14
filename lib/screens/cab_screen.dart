@@ -234,9 +234,13 @@ class _CabScreenState extends State<CabScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
+                final DateTime rideDateTime =
+                    DateTime.parse("${date.text} ${time.text}");
+
               await api.create({
                 "from": from.text,
                 "to": to.text,
+                "rideDateTime": rideDateTime.toIso8601String(),
                 "date": date.text,
                 "time": time.text,
                 "totalSeats": int.parse(seats.text),
