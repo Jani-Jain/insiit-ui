@@ -17,31 +17,32 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
   late String userEmail;
   late Future<List<LostFoundItem>> _lostItemsFuture;
   late Future<List<LostFoundItem>> _myItemsFuture;
-  late Future<List<LostFoundItem>> _foundItemsFuture;
+  late Future<List<dynamic>> _dailyFoundFuture;
 
   @override
   void initState() {
     super.initState();
     userEmail = FirebaseAuth.instance.currentUser?.email ?? "";
     _loadAll();
+    _dailyFoundFuture = apiService.getDailyFoundItems();
   }
 
   void _loadAll() {
     _lostItemsFuture = apiService.getLostItems();
     _myItemsFuture = apiService.getUserItems(userEmail);
-    _foundItemsFuture = apiService.getResolvedItems();
   }
 
   Future<void> _refreshData() async {
     setState(() {
       _loadAll();
+      _dailyFoundFuture = apiService.getDailyFoundItems();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3, // Lost, My Items, Found
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Lost & Found"),
@@ -49,7 +50,7 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
             tabs: [
               Tab(text: "Lost Items"),
               Tab(text: "My Items"),
-              Tab(text: "Found Items"),
+              Tab(text: "Found"),
             ],
           ),
         ),
@@ -116,32 +117,58 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
     );
   }
 
-  // TAB 3 — Found items
+  // TAB 3 — FOUND ITEMS (FROM SHEET)
   Widget _buildFoundItemsTab() {
     return RefreshIndicator(
       onRefresh: _refreshData,
-      child: FutureBuilder<List<LostFoundItem>>(
-        future: _foundItemsFuture,
+      child: FutureBuilder<List<dynamic>>(
+        future: _dailyFoundFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final items = snapshot.data!;
-          if (items.isEmpty) {
-            return const Center(child: Text("No items marked as found yet."));
+          final days = snapshot.data!;
+          if (days.isEmpty) {
+            return const Center(child: Text("No found items."));
           }
 
           return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (c, i) =>
-                _buildItemCard(items[i], showMyButtons: false),
+            itemCount: days.length,
+            itemBuilder: (context, index) {
+              final day = days[index];
+              final date = day["date"];
+              final items = day["items"] as List;
+
+              return Card(
+                margin: const EdgeInsets.all(12),
+                child: ExpansionTile(
+                  title: Text(date),
+                  children: items.isEmpty
+                      ? const [
+                          Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text("No items found on this day"),
+                          )
+                        ]
+                      : items.map((item) {
+                          return ListTile(
+                            title: Text(item["item"]),
+                            subtitle: Text(
+                              "${item["place"]}\n${item["remarks"]}",
+                            ),
+                          );
+                        }).toList(),
+                ),
+              );
+            },
           );
         },
       ),
     );
   }
 
+  // REUSABLE CARD (LOST + MY ITEMS)
   Widget _buildItemCard(LostFoundItem item, {required bool showMyButtons}) {
     return Card(
       margin: const EdgeInsets.all(12),
@@ -155,7 +182,6 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
             child: ImageCarousel(images: item.imageUrls),
           ),
 
-          // TEXT + ACTION BUTTONS
           ListTile(
             title: Text(item.title),
             subtitle: Text("Location: ${item.lostLocation}"),
@@ -231,6 +257,7 @@ class _LostAndFoundScreenState extends State<LostAndFoundScreen> {
   }
 }
 
+// IMAGE CAROUSEL (UNCHANGED)
 class ImageCarousel extends StatefulWidget {
   final List<String> images;
 
@@ -251,14 +278,13 @@ class _ImageCarouselState extends State<ImageCarousel> {
       return Container(
         color: Colors.grey.shade300,
         child: const Center(
-          child: Text("Use your image-ination", style: TextStyle(color: Colors.black54)),
+          child: Text("No image available", style: TextStyle(color: Colors.black54)),
         ),
       );
     }
 
     return Stack(
       children: [
-
         PageView.builder(
           itemCount: imgs.length,
           onPageChanged: (i) => setState(() => _index = i),

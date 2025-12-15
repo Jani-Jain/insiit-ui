@@ -30,6 +30,22 @@ class LostFoundApiService {
     }
   }
 
+
+//found items from sheet
+  Future<List<dynamic>> getDailyFoundItems() async {
+  final response = await http.get(
+    Uri.parse('$BASE_URL/found-items'),
+  );
+
+  if (response.statusCode == 200) {
+    return json.decode(response.body);
+  } else {
+    throw Exception("Failed to load daily found items");
+  }
+}
+ 
+
+
   // Fetch items uploaded by user
   Future<List<LostFoundItem>> getUserItems(String email) async {
     final response =
@@ -65,3 +81,5 @@ class LostFoundApiService {
     return response.statusCode == 200;
   }
 }
+  
+  
